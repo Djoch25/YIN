@@ -51,7 +51,7 @@ class PitchProcessor extends AudioWorkletProcessor {
                     confidence: frequency.confidence,
                     //volume: volume,
                     allow: this.allowYinDetection,
-                    sampleRate: sampleRate
+                    sr: sampleRate
                 }
 
                 this.port.postMessage(audioPackage);
