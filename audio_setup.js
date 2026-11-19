@@ -14,7 +14,7 @@ const startMic = async () => {
   workletNode = new AudioWorkletNode(audioContext, "audio_worklet");
 
   workletNode.port.onmessage = (event) => {
-    const {frequency, confidence, volume, allow} = event.data;
+    const {frequency, confidence, volume, allow, sr} = event.data;
     let stop = "stopYinDetection";
 
     if (confidence > 0.99) {
@@ -32,7 +32,7 @@ const startMic = async () => {
     ctx.fillText("Confidence:  " + confidence, 25, 150);
     ctx.fillText("Volume:      " + volume, 25, 200);
     ctx.fillText("Allow:       " + allow, 25, 250);
-    ctx.fillText("Sample Rate  " + sampleRate, 25, 300);
+    ctx.fillText("Sample Rate  " + sr, 25, 300);
   };
 
   source = audioContext.createMediaStreamSource(stream);
