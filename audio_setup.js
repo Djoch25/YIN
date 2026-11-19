@@ -32,6 +32,7 @@ const startMic = async () => {
     ctx.fillText("Confidence:  " + confidence, 25, 150);
     ctx.fillText("Volume:      " + volume, 25, 200);
     ctx.fillText("Allow:       " + allow, 25, 250);
+    ctx.fillText("Sample Rate  " + sampleRate, 25, 300);
   };
 
   source = audioContext.createMediaStreamSource(stream);
