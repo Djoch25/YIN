@@ -75,6 +75,12 @@ class PitchProcessor extends AudioWorkletProcessor {
                     );
                 }
 
+                // Misura indipendente tramite autocorrelazione
+                const diagnostic = measurePeriod(
+                    this.buffer,
+                    sampleRate
+                );
+
                 this.port.postMessage({
 
                     frequency: result.frequency,
@@ -85,7 +91,11 @@ class PitchProcessor extends AudioWorkletProcessor {
 
                     allow: this.allowYinDetection,
 
-                    sr: sampleRate
+                    sr: sampleRate,
+
+                    diagnosticFrequency: diagnostic.frequency,
+                    diagnosticLag: diagnostic.lag,
+                    diagnosticCorrelation: diagnostic.correlation
                 });
 
                 this.index = 0;
@@ -112,7 +122,7 @@ const yin = (
 
     const df = new Float32Array(maxLag + 1);
 
-    // 1. Difference Function
+    // Difference Function
 
     for (let tau = 0; tau <= maxLag; tau++) {
 
@@ -129,7 +139,7 @@ const yin = (
     }
 
 
-    // 2. CMNDF
+    // CMNDF
 
     const cmndf = new Float32Array(maxLag + 1);
 
@@ -147,7 +157,7 @@ const yin = (
     }
 
 
-    // 3. Absolute Threshold
+    // Absolute Threshold
 
     let tau = -1;
 
@@ -178,7 +188,7 @@ const yin = (
     }
 
 
-    // 4. Parabolic Interpolation
+    // Parabolic Interpolation
 
     let betterTau = tau;
 
@@ -197,7 +207,7 @@ const yin = (
     }
 
 
-    // 5. Fundamental Frequency
+    // Fundamental Frequency
 
     const frequency = sampleRate / betterTau;
 
@@ -208,6 +218,55 @@ const yin = (
         confidence: 1 - cmndf[tau],
 
         tau: betterTau
+    };
+};
+
+
+// ------------------------------------
+// AUTOCORRELAZIONE DIAGNOSTICA
+// ------------------------------------
+
+const measurePeriod = (buffer, sampleRate) => {
+
+    const minLag = Math.floor(sampleRate / 500);
+    const maxLag = Math.ceil(sampleRate / 400);
+
+    let bestLag = -1;
+    let bestCorrelation = -Infinity;
+
+    for (let lag = minLag; lag <= maxLag; lag++) {
+
+        let correlation = 0;
+        let energy1 = 0;
+        let energy2 = 0;
+
+        for (let i = 0; i < buffer.length - lag; i++) {
+
+            correlation += buffer[i] * buffer[i + lag];
+
+            energy1 += buffer[i] * buffer[i];
+            energy2 += buffer[i + lag] * buffer[i + lag];
+        }
+
+        const normalized = correlation /
+            Math.sqrt(energy1 * energy2 + 1e-12);
+
+        if (normalized > bestCorrelation) {
+
+            bestCorrelation = normalized;
+            bestLag = lag;
+        }
+    }
+
+    return {
+
+        lag: bestLag,
+
+        frequency: bestLag > 0
+            ? sampleRate / bestLag
+            : -1,
+
+        correlation: bestCorrelation
     };
 };
 
