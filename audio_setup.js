@@ -120,19 +120,19 @@ const start440Test = async () => {
 
 const updatePitchDisplay = (data) => {
 
-    const {
-        frequency,
-        confidence,
-        volume,
-        allow,
-        sr,
-        tau
-    } = data;
+    const frequency = Number(data.frequency ?? -1);
+    const confidence = Number(data.confidence ?? -1);
+    const volume = Number(data.volume ?? -1);
+    const sr = Number(data.sr ?? 0);
+    const tau = Number(data.tau ?? -1);
+    const allow = data.allow ?? false;
 
-    if (frequency > 0 && confidence >= 0) {
+    if (frequency > 0 && Number.isFinite(frequency)) {
+
         currentMidiPitch = Math.round(
             12 * Math.log2(frequency / 440)
         ) + 69;
+
     } else {
         currentMidiPitch = -1;
     }
@@ -179,7 +179,6 @@ const updatePitchDisplay = (data) => {
         20, 320
     );
 };
-
 
 // ------------------------------------
 // ARRESTO
@@ -232,4 +231,6 @@ const setYinThreshold = (value) => {
 // AVVIO
 // ------------------------------------
 
-startMic();
+startMic().then(() => {
+    setTimeout(start440Test, 1000);
+});
