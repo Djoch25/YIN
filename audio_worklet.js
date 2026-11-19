@@ -2,8 +2,6 @@ class PitchProcessor extends AudioWorkletProcessor {
     constructor() {
         super();
 
-        this.sampleRate = 48000;
-
         this.bufferSize = 2048;
         this.buffer = new Float32Array(this.bufferSize);
         this.index = 0;
@@ -52,7 +50,8 @@ class PitchProcessor extends AudioWorkletProcessor {
                     frequency: frequency.frequency,
                     confidence: frequency.confidence,
                     //volume: volume,
-                    allow: this.allowYinDetection
+                    allow: this.allowYinDetection,
+                    sampleRate: sampleRate
                 }
 
                 this.port.postMessage(audioPackage);
