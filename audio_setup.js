@@ -231,6 +231,17 @@ const setYinThreshold = (value) => {
 // AVVIO
 // ------------------------------------
 
-startMic().then(() => {
-    setTimeout(start440Test, 1000);
-});
+const micButton = document.createElement("button");
+micButton.textContent = "Avvia microfono";
+micButton.style.fontSize = "20px";
+micButton.style.margin = "10px";
+document.body.appendChild(micButton);
+
+const testButton = document.createElement("button");
+testButton.textContent = "Test 440 Hz";
+testButton.style.fontSize = "20px";
+testButton.style.margin = "10px";
+document.body.appendChild(testButton);
+
+micButton.addEventListener("click", startMic);
+testButton.addEventListener("click", start440Test);
