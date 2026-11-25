@@ -39,6 +39,12 @@ const startMic = async () => {
 
         audioContext = new AudioContext();
 
+        const track = stream.getAudioTracks()[0];
+
+        ctx.filltext("Microphone settings: " + track.getSettings(), 200, 50);
+        ctx.filltext("Audio constraints: + " + track.getConstraints(), 200, 250);
+        ctx.filltext("Supported constraints: " + navigator.mediaDevices.getSupportedConstraints(), 200, 300);
+
         if (audioContext.state === "suspended") {
             await audioContext.resume();
         }
