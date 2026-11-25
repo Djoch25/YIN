@@ -7,16 +7,17 @@ let source = null;
 let audioContext = null;
 let oscillator = null;
 let testMode = false;
+let analyser = null;
+let diagnosticTimer = null;
 
 const cnv = document.createElement("canvas");
 const ctx = cnv.getContext("2d");
 
-cnv.width = 650;
-cnv.height = 430;
+cnv.width = 750;
+cnv.height = 650;
 
-ctx.font = "20px Arial";
+ctx.font = "17px Arial";
 document.body.appendChild(cnv);
-
 
 // ------------------------------------
 // AVVIO MICROFONO
@@ -39,21 +40,23 @@ const startMic = async () => {
 
         audioContext = new AudioContext();
 
-        const track = stream.getAudioTracks()[0];
-
-        ctx.fillText("Microphone settings: " + track.getSettings(), 200, 50);
-        ctx.fillText("Audio constraints: + " + track.getConstraints(), 200, 250);
-        ctx.fillText("Supported constraints: " + navigator.mediaDevices.getSupportedConstraints(), 200, 300);
-
-        debugger;
-        return;
-        
         if (audioContext.state === "suspended") {
             await audioContext.resume();
         }
 
+        const track = stream.getAudioTracks()[0];
+        const settings = track.getSettings();
+
+        source = audioContext.createMediaStreamSource(stream);
+
+        // Analizzatore indipendente da YIN
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+
+        source.connect(analyser);
+
         await audioContext.audioWorklet.addModule(
-            "audio_worklet.js?v=diagnostic1"
+            "audio_worklet.js?v=diagnostic2"
         );
 
         workletNode = new AudioWorkletNode(
@@ -65,23 +68,84 @@ const startMic = async () => {
             updatePitchDisplay(event.data);
         };
 
-        source = audioContext.createMediaStreamSource(stream);
-
         source.connect(workletNode);
-
-        // Mantiene attivo il processamento audio.
         workletNode.connect(audioContext.destination);
 
-        drawMessage("MICROFONO ATTIVO");
+        showMicrophoneInfo(track, settings);
+
+        diagnosticTimer = setInterval(() => {
+            updateAudioDiagnostics();
+        }, 250);
 
     } catch (error) {
         drawMessage("ERRORE MICROFONO: " + error.message);
     }
 };
 
+// ------------------------------------
+// INFORMAZIONI MICROFONO
+// ------------------------------------
+
+let microphoneInfo = [];
+
+const showMicrophoneInfo = (track, settings) => {
+
+    const capabilities = navigator.mediaDevices
+        .getSupportedConstraints();
+
+    microphoneInfo = [
+        "DEVICE: " + track.label,
+        "SAMPLE RATE: " + audioContext.sampleRate,
+        "CHANNELS: " + settings.channelCount,
+        "ECHO CANCELLATION: " + settings.echoCancellation,
+        "NOISE SUPPRESSION: " + settings.noiseSuppression,
+        "AUTO GAIN CONTROL: " + settings.autoGainControl,
+        "LATENCY: " + settings.latency,
+        "------------------------------",
+        "SUPPORTED CONSTRAINTS:",
+        "echoCancellation: " + capabilities.echoCancellation,
+        "noiseSuppression: " + capabilities.noiseSuppression,
+        "autoGainControl: " + capabilities.autoGainControl
+    ];
+
+    drawDiagnostics();
+};
 
 // ------------------------------------
-// TEST CON SINUSOIDE A 440 Hz
+// ANALISI SEGNALE MICROFONO
+// ------------------------------------
+
+let rmsValue = 0;
+let peakValue = 0;
+
+const updateAudioDiagnostics = () => {
+
+    if (!analyser) return;
+
+    const buffer = new Float32Array(analyser.fftSize);
+
+    analyser.getFloatTimeDomainData(buffer);
+
+    let sum = 0;
+    let peak = 0;
+
+    for (let i = 0; i < buffer.length; i++) {
+
+        const value = buffer[i];
+
+        sum += value * value;
+
+        peak = Math.max(peak, Math.abs(value));
+    }
+
+    rmsValue = Math.sqrt(sum / buffer.length);
+    peakValue = peak;
+
+    drawDiagnostics();
+};
+
+// ------------------------------------
+// TEST 440 Hz
 // ------------------------------------
 
 const start440Test = async () => {
@@ -97,7 +161,7 @@ const start440Test = async () => {
         }
 
         await audioContext.audioWorklet.addModule(
-            "audio_worklet.js?v=diagnostic1"
+            "audio_worklet.js?v=diagnostic2"
         );
 
         workletNode = new AudioWorkletNode(
@@ -109,7 +173,6 @@ const start440Test = async () => {
             updatePitchDisplay(event.data);
         };
 
-        // Mantiene attivo il processamento.
         workletNode.connect(audioContext.destination);
 
         oscillator = audioContext.createOscillator();
@@ -127,10 +190,11 @@ const start440Test = async () => {
     }
 };
 
+// ------------------------------------
+// VISUALIZZAZIONE YIN
+// ------------------------------------
 
-// ------------------------------------
-// VISUALIZZAZIONE
-// ------------------------------------
+let pitchInfo = [];
 
 const updatePitchDisplay = (data) => {
 
@@ -150,56 +214,99 @@ const updatePitchDisplay = (data) => {
         Number(data.diagnosticCorrelation ?? -1);
 
     if (frequency > 0 && Number.isFinite(frequency)) {
-
         currentMidiPitch = Math.round(
             12 * Math.log2(frequency / 440)
         ) + 69;
-
     } else {
         currentMidiPitch = -1;
     }
 
-    ctx.clearRect(0, 0, cnv.width, cnv.height);
-
-    const lines = [
-        "Mode: " + (testMode ? "440 Hz TEST" : "MICROPHONE"),
-        "YIN Frequency: " + frequency.toFixed(2) + " Hz",
-        "YIN Tau: " + tau.toFixed(3),
+    pitchInfo = [
+        "MODE: " + (testMode ? "440 Hz TEST" : "MICROPHONE"),
+        "YIN FREQUENCY: " + frequency.toFixed(2) + " Hz",
+        "YIN TAU: " + tau.toFixed(3),
         "MIDI: " + currentMidiPitch,
-        "Confidence: " + confidence.toFixed(4),
-        "Sample Rate: " + sr,
-        "Volume: " + volume.toFixed(6),
-        "-----------------------------",
-        "Autocorrelation: " +
-            diagnosticFrequency.toFixed(2) + " Hz",
-        "Diagnostic Lag: " + diagnosticLag,
-        "Correlation: " +
+        "CONFIDENCE: " + confidence.toFixed(4),
+        "WORKLET SAMPLE RATE: " + sr,
+        "YIN VOLUME: " + volume.toFixed(6),
+        "------------------------------",
+        "DIAGNOSTIC FREQUENCY: " +
+            diagnosticFrequency.toFixed(2),
+        "DIAGNOSTIC LAG: " + diagnosticLag,
+        "CORRELATION: " +
             diagnosticCorrelation.toFixed(4)
     ];
 
-    lines.forEach((line, i) => {
-        ctx.fillText(line, 20, 30 + i * 36);
-    });
+    drawDiagnostics();
 };
 
-
 // ------------------------------------
-// MESSAGGIO CANVAS
+// DIAGNOSTICA GRAFICA
 // ------------------------------------
 
-const drawMessage = (message) => {
+const drawDiagnostics = () => {
 
     ctx.clearRect(0, 0, cnv.width, cnv.height);
 
-    ctx.fillText(message, 20, 40);
+    let y = 25;
+
+    ctx.font = "bold 19px Arial";
+    ctx.fillText("AUDIO DIAGNOSTICS", 15, y);
+
+    y += 35;
+
+    ctx.font = "16px Arial";
+
+    microphoneInfo.forEach(line => {
+        ctx.fillText(line, 15, y);
+        y += 23;
+    });
+
+    y += 12;
+
+    ctx.font = "bold 17px Arial";
+    ctx.fillText("LIVE AUDIO", 15, y);
+
+    y += 28;
+
+    ctx.font = "16px Arial";
+
+    [
+        "AUDIOCONTEXT STATE: " +
+            (audioContext?.state ?? "CLOSED"),
+
+        "RMS: " + rmsValue.toFixed(7),
+
+        "PEAK: " + peakValue.toFixed(7)
+    ].forEach(line => {
+        ctx.fillText(line, 15, y);
+        y += 25;
+    });
+
+    y += 12;
+
+    pitchInfo.forEach(line => {
+        ctx.fillText(line, 15, y);
+        y += 24;
+    });
 };
 
+const drawMessage = (message) => {
+    ctx.clearRect(0, 0, cnv.width, cnv.height);
+    ctx.font = "18px Arial";
+    ctx.fillText(message, 15, 35);
+};
 
 // ------------------------------------
 // ARRESTO
 // ------------------------------------
 
 const stopMic = async () => {
+
+    if (diagnosticTimer) {
+        clearInterval(diagnosticTimer);
+        diagnosticTimer = null;
+    }
 
     if (oscillator) {
         try {
@@ -217,6 +324,7 @@ const stopMic = async () => {
 
     workletNode?.disconnect();
     source?.disconnect();
+    analyser?.disconnect();
 
     if (audioContext) {
         await audioContext.close();
@@ -224,14 +332,16 @@ const stopMic = async () => {
 
     workletNode = null;
     source = null;
+    analyser = null;
     audioContext = null;
 
     currentMidiPitch = -1;
+    rmsValue = 0;
+    peakValue = 0;
 };
 
-
 // ------------------------------------
-// CONTROLLO SOGLIA YIN
+// SOGLIA YIN
 // ------------------------------------
 
 const setYinThreshold = (value) => {
@@ -242,36 +352,29 @@ const setYinThreshold = (value) => {
     });
 };
 
-
 // ------------------------------------
 // PULSANTI
 // ------------------------------------
 
 const micButton = document.createElement("button");
-
 micButton.textContent = "Avvia microfono";
 micButton.style.fontSize = "20px";
 micButton.style.margin = "10px";
 
 document.body.appendChild(micButton);
 
-
 const testButton = document.createElement("button");
-
 testButton.textContent = "Test 440 Hz";
 testButton.style.fontSize = "20px";
 testButton.style.margin = "10px";
 
 document.body.appendChild(testButton);
 
-
 micButton.addEventListener("click", startMic);
 testButton.addEventListener("click", start440Test);
-
 
 // ------------------------------------
 // STATO INIZIALE
 // ------------------------------------
 
 drawMessage("Premi Avvia microfono oppure Test 440 Hz");
-
