@@ -31,7 +31,7 @@ const startMic = async () => {
 
         stream = await navigator.mediaDevices.getUserMedia({
             audio: {
-                sampleRate: 44100,
+                sampleRate: 48000,
                 echoCancellation: false,
                 noiseSuppression: false,
                 autoGainControl: false,
