@@ -1,52 +1,6 @@
-<button id="start">🎙️ Inizia registrazione</button>
-<button id="stop" disabled>⏹️ Ferma registrazione</button>
-
-<script>
-let mediaRecorder;
-let audioChunks = [];
-
-document.getElementById("start").onclick = async () => {
-    // Richiede l'accesso al microfono
-    const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true
-    });
-
-    mediaRecorder = new MediaRecorder(stream);
-    audioChunks = [];
-
-    // Salva i dati audio
-    mediaRecorder.ondataavailable = (event) => {
-        audioChunks.push(event.data);
-    };
-
-    mediaRecorder.start();
-
-    document.getElementById("start").disabled = true;
-    document.getElementById("stop").disabled = false;
-};
-
-document.getElementById("stop").onclick = () => {
-    mediaRecorder.stop();
-
-    mediaRecorder.onstop = () => {
-        // Crea un file audio
-        const audioBlob = new Blob(audioChunks, {
-            type: mediaRecorder.mimeType
-        });
-
-        const audioURL = URL.createObjectURL(audioBlob);
-
-        // Crea un player
-        const audio = new Audio(audioURL);
-        audio.controls = true;
-
-        document.body.appendChild(audio);
-
-        // Ferma il microfono
-        mediaRecorder.stream.getTracks().forEach(track => track.stop());
-
-        document.getElementById("start").disabled = false;
-        document.getElementById("stop").disabled = true;
-    };
-};
-</script>
+<!DOCTYPE html>
+<html>
+    <body>
+        <script src="audio_setup.js?v=1"></script>
+    </body>
+</html>
